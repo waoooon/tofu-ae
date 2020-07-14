@@ -1,0 +1,16 @@
+version: "3.1"
+services:
+  web:
+    image: rust:1.44.0
+    ports:
+      - "80:3000"
+    depends_on:
+      - redis
+    volumes:
+      - ./:/root
+      - ./.cargo/registry:/usr/local/cargo/registry
+    command: ['sh', '-c', 'cd /root && cargo run']
+  redis:
+    image: redis:6.0
+    ports:
+      - 6379:6379
