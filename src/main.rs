@@ -1,27 +1,10 @@
+extern crate c_img as ci;
+
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server, StatusCode};
-use redis::AsyncCommands;
 
+use std::collections::HashMap;
 
-async fn get_redis(key: &str) -> Option<Vec<u8>> {
-    let client = redis::Client::open("redis://redis/").expect("url error");
-    let mut con = client.get_async_connection().await.expect("connect error");
-    match con.get(key).await {
-        Ok(res) => Some(res),
-        _ => None,
-    }
-}
-
-fn image_convert(img: &[u8], ext: image::ImageOutputFormat) -> Result<Vec<u8>, String> {
-    match image::load_from_memory(img) {
-        Ok(res) => {
-            let mut output = Vec::new();
-            res.write_to(&mut output, ext).unwrap();
-            Ok(output)
-        },
-        Err(err) => Err(err.to_string()),
-    }
-}
 
 fn not_found() -> Result<Response<Body>, hyper::Error> {
     let mut not_found = Response::default();
@@ -29,13 +12,13 @@ fn not_found() -> Result<Response<Body>, hyper::Error> {
     Ok(not_found)
 }
 
-fn get_ext(ext: Option<&str>) -> Option<image::ImageOutputFormat> {
-    match ext {
-        Some(e) if e == "png" => Some(image::ImageOutputFormat::Png),
-        Some(e) if e == "jpeg" || e == "jpg" => Some(image::ImageOutputFormat::Jpeg(60)),
-        Some(e) if e == "gif" => Some(image::ImageOutputFormat::Gif),
-        Some(e) if e == "bmp" => Some(image::ImageOutputFormat::Bmp),
-        _ => None,
+fn to_hash(opt: Option<&str>) -> HashMap<&str, &str> {
+    match opt {
+        Some(st) => st.split("&").collect::<Vec<_>>().iter().map(|s| {
+            let t = s.split("=").collect::<Vec<_>>();
+            (t[0], t[1])
+        }).collect::<HashMap<_, _>>(),
+        _ => HashMap::new(),
     }
 }
 
@@ -46,10 +29,14 @@ async fn echo(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     let file_stem = path.file_stem().unwrap();
     let file_ext = path.extension().unwrap();
 
-    match (get_redis(file_stem.to_str().unwrap()).await, get_ext(file_ext.to_str())) {
-        (Some(res), Some(x)) if res.len() > 0 => {
-            match image_convert(&res, x) {
-                Ok(img) => Ok(Response::new(Body::from(img))),
+    match (ci::get::redis(file_stem.to_str().unwrap()).await, ci::get::ext(file_ext.to_str())) {
+        (Some(res), Some(ext)) if res.len() > 0 => {
+            match ci::get::img::load(&res) {
+                Ok(img) => {
+                    let get = to_hash(p.query());
+                    let img = ci::get::img::op(img, get);
+                    Ok(Response::new(Body::from(ci::get::img::convert(img, ext))))
+                },
                 _ => not_found(),
             }
         },
