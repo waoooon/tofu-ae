@@ -1,4 +1,4 @@
-extern crate c_img as ci;
+extern crate tofu_ae as app;
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server, StatusCode};
@@ -29,13 +29,13 @@ async fn echo(req: Request<Body>) -> Result<Response<Body>, hyper::Error> {
     let file_stem = path.file_stem().unwrap();
     let file_ext = path.extension().unwrap();
 
-    match (ci::get::redis(file_stem.to_str().unwrap()).await, ci::get::ext(file_ext.to_str())) {
+    match (app::get::redis(file_stem.to_str().unwrap()).await, app::get::ext(file_ext.to_str())) {
         (Some(res), Some(ext)) if res.len() > 0 => {
-            match ci::get::img::load(&res) {
+            match app::get::img::load(&res) {
                 Ok(img) => {
                     let get = to_hash(p.query());
-                    let img = ci::get::img::op(img, get);
-                    Ok(Response::new(Body::from(ci::get::img::convert(img, ext))))
+                    let img = app::get::img::op(img, get);
+                    Ok(Response::new(Body::from(app::get::img::convert(img, ext))))
                 },
                 _ => not_found(),
             }
