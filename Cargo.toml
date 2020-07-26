@@ -1,5 +1,5 @@
 [package]
-name = "c-img"
+name = "tofu-ae"
 version = "0.1.0"
 authors = ["waoooon <waoooon@sahagyo.com>"]
 edition = "2018"
